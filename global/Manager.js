@@ -18,15 +18,27 @@ class Manager {
         this.world = mysql.createConnection({ host:'127.0.0.1', user:'trinity', password:'trinity', database:'world', insecureAuth: true});
         this.creatureTemplate = [];
         this.playerInfo = [];
-        this.LoadCreatureTemplates();
-        this.LoadPlayerInfo();
+        this.itemTemplate  = [];
+      //  this.LoadCreatureTemplates();
+     //   this.LoadPlayerInfo();
         this.LoadChrRacesDBC();
+      //  this.LoadItemTemplates();
     }
     
     LoadChrRacesDBC() {
         for (var val of ChrRaces) {
             this.ChrRaces[val.ID] = val;
         }
+    }
+    
+    LoadItemTemplates() {
+        var self = this;
+        var ms = Date.now();
+        this.world.query("SELECT * FROM item_template", function (err, result, fields) {
+            for (var val of result) 
+                self.itemTemplate[val.entry] = val;
+            console.log("server.loading".green, ">> Loaded " + result.length + " item definitions in " + (Date.now() - ms) + " ms");
+        });
     }
     
     LoadCreatureTemplates() {

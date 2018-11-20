@@ -1,10 +1,11 @@
+const zlib = require('zlib');
 class SMSG {
     constructor(code) {
         this.code = code;
 		this.dataLength = 0;
 		this.data = new Uint8Array(809600);
 		this.view = new DataView(this.data.buffer);
-        this.uint16(code);
+       // this.uint16(code);
 	}
     uint8(val) {
 		this.view.setUint8(this.dataLength, val);
@@ -56,12 +57,24 @@ class SMSG {
 		this.array(packGUID.slice(0, size), false);
 	}
     buffer() {
-		var buffer = new Buffer.alloc(this.dataLength + 2);
-		buffer[0] = this.dataLength >> 8;
-		buffer[1] = this.dataLength;
+        if (this.code == 0x0A9 && this.dataLength > 100) {
+            this.code = 0x01F6; 
+            var buffer = new Buffer.alloc(this.dataLength);
+            for (var i = 0; i < this.dataLength; ++i)
+                buffer[i] = this.data[i];
+            var zip = zlib.deflateSync(buffer, {level: zlib.Z_NO_COMPRESSION});
+            this.dataLength = 0;
+            this.uint32(zip.length);
+            this.array(zip, false); 
+        }
+		var buffer = new Buffer.alloc(this.dataLength + 4);
+		buffer[0] = ((this.dataLength + 2) >> 8) & 0xFF;
+		buffer[1] = (this.dataLength + 2) & 0xFF;
+        buffer[2] = this.code & 0xFF;
+        buffer[3] = (this.code >> 8) & 0xFF;
 		for (var i = 0; i < this.dataLength; ++i)
-			buffer[i + 2] = this.data[i];
-       // console.log('[DEBUG]'.blue + ' code: ' + this.code + ' length: ' + this.dataLength);
+			buffer[i + 4] = this.data[i];
+        //console.log('[DEBUG]'.blue + ' code: ' + this.code.toString(16) + ' length: ' + this.dataLength);
 		return buffer;
 	}
 }

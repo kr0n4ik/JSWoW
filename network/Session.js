@@ -1,4 +1,3 @@
-var zlib = require('zlib');
 const utf8 = require('utf8');
 const mysql = require('mysql');
 const Crypt = require('../utils/Crypt.js');
@@ -89,7 +88,7 @@ class Session {
 		return buffer;
 	}
     HelperWrite(buffer, io = 'out') {
-        return;
+       // return;
         function codes(n) {
 			for (var c in opcode)
 				if (opcode[c] == n)
@@ -217,15 +216,15 @@ class Session {
             
             var equipments = character.equipmentCache.split(' ');
             for (var slot = 0; slot < 23; ++slot) {
-                if (equipments[slot] != 0) {
+                //if (manager.itemTemplate[equipments[slot*2]]) {
+                  //  smsg.uint32(manager.itemTemplate[equipments[slot*2]].displayid);
+                 //   smsg.uint8(0);
+                 //   smsg.uint32(0);
+              //  } else {
                     smsg.uint32(0);
                     smsg.uint8(0);
                     smsg.uint32(0);
-                } else {
-                    smsg.uint32(0);
-                    smsg.uint8(0);
-                    smsg.uint32(0);  
-                }
+               // }
             }
         }
         this.Write(smsg.buffer());
@@ -243,7 +242,7 @@ class Session {
         var facialHair = cmsg.uint8();
         var playerBytes = skin | (face << 8) | (hairStyle << 16) | (hairColor << 24);
         var playerBytes2 = facialHair;
-        name = name.charAt(0).toUpperCase() + name.slice(1);
+        name = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
         characters.query("SELECT * FROM characters;", function (err, result, fields) {
             world.query("SELECT * FROM playercreateinfo WHERE race=? AND class=?;", [race, clas], function (err, info, fields) {
                 characters.query("INSERT INTO characters SET guid=?, account=?, name=?, race=?, class=?, gender=?, playerBytes=?, playerBytes2=?, equipmentCache=?, map=?, zone=?, position_x=?, position_y=?, position_z=?, orientation=?, level=?;", [result.length, client.account, name, race, clas, gender, playerBytes, playerBytes2, '0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ', info[0].map, info[0].zone, info[0].position_x, info[0].position_y, info[0].position_z, info[0].orientation, 1], function (err, result, fields) {client.CharCreateCallback(result)});
@@ -286,8 +285,7 @@ class Session {
         this.player.setPosition(result[0].position_x, result[0].position_y, result[0].position_z, result[0].orientation);
         this.player.setLevel(result[0].level);
         var display = (result[0].gender == 1) ? manager.ChrRaces[result[0].race].FemaleDisplayId : manager.ChrRaces[result[0].race].MaleDisplayId;
-        this.player.setDisplayID(display); 
-        
+        this.player.setDisplayID(display);
         
         for (var guid in manager.map) {
             if (guid && manager.map[guid].player) {
@@ -312,7 +310,7 @@ class Session {
         smsg.uint32(1);
         smsg.array(block, false);
         manager.Write( smsg.buffer(), this.player.guid);
-        
+
         var smsg = new SMSG(opcode.SMSG_TIME_SYNC_REQ);
         smsg.uint32(0);
         this.Write(smsg.buffer());
