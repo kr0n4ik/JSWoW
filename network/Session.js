@@ -1,13 +1,24 @@
+var zlib = require('zlib');
+const utf8 = require('utf8');
 const mysql = require('mysql');
 const Crypt = require('../utils/Crypt.js');
+const Bytes = require('../utils/Bytes.js');
 const SMSG = require('./SMSG.js');
 const CMSG = require('./CMSG.js');
 const Player = require('../entities/Player.js');
+const Unit = require('../entities/Unit.js');
 const opcode = require('./opcode.js');
 const recode = require('../enums/response.js');
 
-var auth = mysql.createConnection({ host:'127.0.0.1', user:'trinity', password:'trinity', database:'auth', insecureAuth: true});
-var characters = mysql.createConnection({ host:'127.0.0.1', user:'trinity', password:'trinity', database:'characters', insecureAuth: true});
+var map = require('../global/map.js'); 
+const manager = require('../global/Manager.js'); 
+
+var auth = mysql.createConnection({ host:'127.0.0.1', user:'trinity', password:'trinity', database:'auth', insecureAuth: true, charset  : 'utf8mb4'});
+var characters = mysql.createConnection({ host:'127.0.0.1', user:'trinity', password:'trinity', database:'characters', insecureAuth: true, charset  : 'utf8mb4'});
+var world = mysql.createConnection({ host:'127.0.0.1', user:'trinity', password:'trinity', database:'world', insecureAuth: true, charset  : 'utf8mb4'});
+
+characters.query("SET NAMES utf8");
+
 
 class Session {
     constructor(socket){
@@ -30,18 +41,46 @@ class Session {
 		switch(code) {
 			case opcode.CMSG_AUTH_SESSION: this.AuthSession(cmsg); break;
 			//case opcode.CMSG_REALM_SPLIT: this.RealmSplit(cmsg); break;
-			//case opcode.CMSG_PING: this.Ping(cmsg); break;
+			case opcode.CMSG_PING: this.Ping(cmsg); break;
 			case opcode.CMSG_CHAR_ENUM: this.CharEnum(cmsg); break;
             case opcode.CMSG_CHAR_CREATE: this.CharCreate(cmsg); break;
+            case opcode.CMSG_SET_PLAYER_DECLINED_NAMES: this.SetPlayerDeclinedNames(cmsg); break;
 			case opcode.CMSG_PLAYER_LOGIN: this.PlayerLogin(cmsg); break;
-            //case opcode.CMSG_UI_TIME_REQUEST: this.UITimeRequest(cmsg); break;
-			//case opcode.CMSG_JOIN_CHANNEL: this.JoinChannel(cmsg); break;
-            //case opcode.CMSG_CAST_SPELL: this.CastlSpell(cmsg); break;
+            case opcode.CMSG_ITEM_QUERY_SINGLE: this.ItemQuerySingle(cmsg); break;
+                
+            case opcode.MSG_MOVE_STOP: this.Movement(cmsg); break;
+            case opcode.MSG_MOVE_START_FORWARD: this.Movement(cmsg); break;
+            case opcode.MSG_MOVE_START_BACKWARD: this.Movement(cmsg); break;
+            case opcode.MSG_MOVE_START_STRAFE_LEFT: this.Movement(cmsg); break;
+            case opcode.MSG_MOVE_START_STRAFE_RIGHT: this.Movement(cmsg); break;
+            case opcode.MSG_MOVE_STOP_STRAFE: this.Movement(cmsg); break;
+            case opcode.MSG_MOVE_HEARTBEAT: this.Movement(cmsg); break;
+            case opcode.MSG_MOVE_START_TURN_LEFT: this.Movement(cmsg); break;
+            case opcode.MSG_MOVE_START_TURN_RIGHT: this.Movement(cmsg); break;    
+            case opcode.MSG_MOVE_STOP_TURN: this.Movement(cmsg); break;  
+            case opcode.MSG_MOVE_JUMP: this.Movement(cmsg); break;
+            case opcode.MSG_MOVE_FALL_LAND: this.Movement(cmsg); break;   
+                
+                
+                
+            case opcode.CMSG_LOGOUT_REQUEST: this.LogoutRequest(cmsg); break;
+            case opcode.CMSG_LOGOUT_CANCEL: this.LogoutCancel(cmsg); break;
+
 			default:
 				console.log('[WARNING]: '.red + "Unknown packet. Command: 0x" + code.toString(16) + " size: " + size + " length: " + buffer.length );
 			break;
 		}
         this.HelperWrite(buffer, 'in');
+    }
+    LogoutRequest(cmsg) {
+        var smsg = new SMSG(opcode.SMSG_LOGOUT_RESPONSE);
+        smsg.uint32(0x00000000);
+        smsg.uint8(0x00);
+        this.Write(smsg.buffer());
+    }
+    LogoutCancel(cmsg) {
+        var smsg = new SMSG(opcode.SMSG_LOGOUT_CANCEL_ACK);
+        this.Write(smsg.buffer());
     }
     Random(size) {
 		var buffer = new Buffer.alloc(size);
@@ -50,6 +89,7 @@ class Session {
 		return buffer;
 	}
     HelperWrite(buffer, io = 'out') {
+        return;
         function codes(n) {
 			for (var c in opcode)
 				if (opcode[c] == n)
@@ -83,6 +123,14 @@ class Session {
 		var buffer = this.crypt.encrypt(buffer);
 		this.socket.write(buffer);
     }
+    Ping(cmsg) {
+        this.ping = Date.now();
+		var ping = cmsg.uint32();
+		var latency = cmsg.uint32();
+		var smsg = new SMSG(opcode.SMSG_PONG);
+		smsg.uint32(ping);
+		this.Write(smsg.buffer());
+	}
     AuthChallenge() {
         var smsg = new SMSG(opcode.SMSG_AUTH_CHALLENGE);
 		this.seed = this.Random(16);
@@ -118,7 +166,6 @@ class Session {
 		auth.query("SELECT sessionkey, id FROM account WHERE username=?", [Account.toLowerCase()], function (err, result, fields) {client.AuthSessionCallback(result)});
 	}
     AuthSessionCallback(result) {
-        console.log(result);
         if (!result) {
             var smsg = new SMSG(opcode.SMSG_AUTH_RESPONSE);
             smsg.uint8(recode.AUTH_UNKNOWN_ACCOUNT);
@@ -169,7 +216,6 @@ class Session {
             smsg.uint32(0x00000000); //pet famaily
             
             var equipments = character.equipmentCache.split(' ');
-            console.log(equipments.length);
             for (var slot = 0; slot < 23; ++slot) {
                 if (equipments[slot] != 0) {
                     smsg.uint32(0);
@@ -196,9 +242,20 @@ class Session {
         var hairColor = cmsg.uint8();
         var facialHair = cmsg.uint8();
         var playerBytes = skin | (face << 8) | (hairStyle << 16) | (hairColor << 24);
+        var playerBytes2 = facialHair;
+        name = name.charAt(0).toUpperCase() + name.slice(1);
         characters.query("SELECT * FROM characters;", function (err, result, fields) {
-            characters.query("INSERT INTO characters SET guid=?, account=?, name=?, race=?, class=?, gender=?, playerBytes=?, playerBytes2=?, equipmentCache=?;", [result.length, client.account, name, race, clas, gender, playerBytes, facialHair, '0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 '], function (err, result, fields) {client.CharCreateCallback(result)});
+            world.query("SELECT * FROM playercreateinfo WHERE race=? AND class=?;", [race, clas], function (err, info, fields) {
+                characters.query("INSERT INTO characters SET guid=?, account=?, name=?, race=?, class=?, gender=?, playerBytes=?, playerBytes2=?, equipmentCache=?, map=?, zone=?, position_x=?, position_y=?, position_z=?, orientation=?, level=?;", [result.length, client.account, name, race, clas, gender, playerBytes, playerBytes2, '0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ', info[0].map, info[0].zone, info[0].position_x, info[0].position_y, info[0].position_z, info[0].orientation, 1], function (err, result, fields) {client.CharCreateCallback(result)});
+            });
         });
+    }
+    SetPlayerDeclinedNames(cmsg) {
+        var guid = cmsg.uint64();
+        var smsg = new SMSG(opcode.SMSG_SET_PLAYER_DECLINED_NAMES_RESULT);
+        smsg.uint32(0);
+        smsg.uint64(guid);
+        this.Write(smsg.buffer());
     }
     CharCreateCallback(result) {
         if (!result) {
@@ -222,24 +279,71 @@ class Session {
             console.log('[ERROR]: '.red + ' mysql');
             return;
         }
-        this.player = new Player(result[0].guid);
         
-        this.player.setDisplayID(49);
-        this.player.setHealth(result[0].health);
-        this.player.setLevel(result[0].level);
-        this.player.setUnitBytes(result[0].race | (result[0].class << 8) | (result[0].gender << 16) | (2 << 24) );
+        this.player = new Player();
+        this.player.setGuid(result[0].guid, 0x0000);
+        this.player.setType();
         this.player.setPosition(result[0].position_x, result[0].position_y, result[0].position_z, result[0].orientation);
-        this.player.setFactionTemplate(1);
+        this.player.setLevel(result[0].level);
+        var display = (result[0].gender == 1) ? manager.ChrRaces[result[0].race].FemaleDisplayId : manager.ChrRaces[result[0].race].MaleDisplayId;
+        this.player.setDisplayID(display); 
         
         
+        for (var guid in manager.map) {
+            if (guid && manager.map[guid].player) {
+                if (manager.map[guid].player == this.player) {
+                    var block = manager.map[guid].player.Create(113);
+                    var smsg = new SMSG(opcode.SMSG_UPDATE_OBJECT);
+                    smsg.uint32(1);
+                    smsg.array(block, false);
+                    this.Write(smsg.buffer());
+                } else {
+                    var block = manager.map[guid].player.Create(112);
+                    var smsg = new SMSG(opcode.SMSG_UPDATE_OBJECT);
+                    smsg.uint32(1);
+                    smsg.array(block, false);
+                    this.Write(smsg.buffer());  
+                }
+            }
+        }
+        
+        var block = this.player.Create(112);
         var smsg = new SMSG(opcode.SMSG_UPDATE_OBJECT);
         smsg.uint32(1);
-        smsg.array(this.player.BlockBuffer(), false);
-        this.Write(smsg.buffer());
+        smsg.array(block, false);
+        manager.Write( smsg.buffer(), this.player.guid);
         
         var smsg = new SMSG(opcode.SMSG_TIME_SYNC_REQ);
         smsg.uint32(0);
         this.Write(smsg.buffer());
+    }
+    Movement(cmsg) {
+        var guid = cmsg.guid();
+        var flags = cmsg.uint32();
+        var extra = cmsg.uint16();
+        var time = cmsg.uint32();
+        var x = cmsg.float();
+        var y = cmsg.float();
+        var z = cmsg.float();
+        var o = cmsg.float();
+        var falltime = cmsg.uint32();
+        this.player.setPosition(x, y, z, o);
+        this.player.setTime(time);
+        var smsg = new SMSG(cmsg.code);
+        smsg.guid(guid);
+        smsg.uint32(flags);
+        smsg.uint16(extra);
+        smsg.uint32(time);
+        smsg.float(x);
+        smsg.float(y);
+        smsg.float(z);
+        smsg.float(o);
+        smsg.uint32(falltime);
+        manager.Write(smsg.buffer(), guid);
+    }
+    ItemQuerySingle(cmsg) {
+        var item = cmsg.uint32();
+        console.log("STORAGE: Item Query = " + item);
     }
 }
 module.exports = Session;

@@ -52,7 +52,6 @@ class Bytes {
 		var buffer = new Buffer.alloc(this.dataLength);
 		for (var i = 0; i < this.dataLength; ++i)
 			buffer[i] = this.data[i];
-        console.log('[DEBUG]'.blue + ' code: all length: ' + this.dataLength);
 		return buffer;
 	}
 }

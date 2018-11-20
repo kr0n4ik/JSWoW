@@ -2,7 +2,7 @@ class SMSG {
     constructor(code) {
         this.code = code;
 		this.dataLength = 0;
-		this.data = new Uint8Array(4096);
+		this.data = new Uint8Array(809600);
 		this.view = new DataView(this.data.buffer);
         this.uint16(code);
 	}
@@ -35,12 +35,13 @@ class SMSG {
                 this.uint8(val[i]);
 	}
     string(val) {
-		for (var i = 0; i < val.length; ++i)
-			this.uint8(val.charCodeAt(i) & 0xFF);
+        var val = new Buffer(val);
+        for (var i = 0; i < val.length; ++i)
+            this.uint8(val[i] & 0xFF);
 		this.uint8(0);
 	}
     guid(val) {
-		var tguid = val;
+		var tguid = BigInt(val);
 		var packGUID = new Buffer.alloc(9);
 		packGUID[0] = 0;
 		var size = 1;
@@ -60,7 +61,7 @@ class SMSG {
 		buffer[1] = this.dataLength;
 		for (var i = 0; i < this.dataLength; ++i)
 			buffer[i + 2] = this.data[i];
-        console.log('[DEBUG]'.blue + ' code: ' + this.code + ' length: ' + this.dataLength);
+       // console.log('[DEBUG]'.blue + ' code: ' + this.code + ' length: ' + this.dataLength);
 		return buffer;
 	}
 }
