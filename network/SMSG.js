@@ -3,7 +3,7 @@ class SMSG {
     constructor(code) {
         this.code = code;
 		this.dataLength = 0;
-		this.data = new Uint8Array(809600);
+		this.data = new Uint8Array(8096000);
 		this.view = new DataView(this.data.buffer);
        // this.uint16(code);
 	}
@@ -74,7 +74,7 @@ class SMSG {
         buffer[3] = (this.code >> 8) & 0xFF;
 		for (var i = 0; i < this.dataLength; ++i)
 			buffer[i + 4] = this.data[i];
-        //console.log('[DEBUG]'.blue + ' code: ' + this.code.toString(16) + ' length: ' + this.dataLength);
+        console.log('[DEBUG]'.blue + ' code: ' + this.code.toString(16) + ' length: ' + this.dataLength);
 		return buffer;
 	}
 }

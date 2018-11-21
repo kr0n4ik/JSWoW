@@ -47,6 +47,9 @@ class Session {
 			case opcode.CMSG_PLAYER_LOGIN: this.PlayerLogin(cmsg); break;
             case opcode.CMSG_ITEM_QUERY_SINGLE: this.ItemQuerySingle(cmsg); break;
                 
+            case opcode.CMSG_SET_SELECTION: this.SetSelection(cmsg); break;
+            case opcode.CMSG_LIST_INVENTORY: this.ListInventory(cmsg); break;
+                
             case opcode.MSG_MOVE_STOP: this.Movement(cmsg); break;
             case opcode.MSG_MOVE_START_FORWARD: this.Movement(cmsg); break;
             case opcode.MSG_MOVE_START_BACKWARD: this.Movement(cmsg); break;
@@ -58,7 +61,9 @@ class Session {
             case opcode.MSG_MOVE_START_TURN_RIGHT: this.Movement(cmsg); break;    
             case opcode.MSG_MOVE_STOP_TURN: this.Movement(cmsg); break;  
             case opcode.MSG_MOVE_JUMP: this.Movement(cmsg); break;
-            case opcode.MSG_MOVE_FALL_LAND: this.Movement(cmsg); break;   
+            case opcode.MSG_MOVE_FALL_LAND: this.Movement(cmsg); break;  
+                
+            
                 
                 
                 
@@ -314,6 +319,8 @@ class Session {
         var smsg = new SMSG(opcode.SMSG_TIME_SYNC_REQ);
         smsg.uint32(0);
         this.Write(smsg.buffer());
+        
+        this.CreateNpc();
     }
     Movement(cmsg) {
         var guid = cmsg.guid();
@@ -342,6 +349,39 @@ class Session {
     ItemQuerySingle(cmsg) {
         var item = cmsg.uint32();
         console.log("STORAGE: Item Query = " + item);
+    }
+    CreateNpc() {
+        var self = this;
+        world.query("SELECT * FROM creature WHERE map=0 AND position_x<? AND position_x>? AND position_y<? AND position_y>?;", [this.player.x+100, this.player.x-100, this.player.y+100, this.player.y-100], function (err, result, fields) {
+             var smsg = new SMSG(opcode.SMSG_UPDATE_OBJECT);
+            smsg.uint32(result.length);
+            for (var u of result){
+                var template = manager.creatureTemplate[u.id];
+                var unit = new Unit();
+                unit.setGuid(u.guid, 0xF130);
+                unit.setEntry(u.id);
+                unit.setUpdateFlag(112);
+                unit.setType();
+                unit.setDisplayID(template.modelid1);
+                unit.setPosition(u.position_x, u.position_y, u.position_z, u.orientation);
+                unit.setNpcFlag(template.npcflag);
+                unit.setUnitFlag(template.unit_flags);
+                var block = unit.Create();
+                smsg.array(block, false);
+            }
+            self.Write(smsg.buffer());
+        });
+    }
+    
+    SetSelection(cmsg) {
+        var guid = cmsg.uint64();
+        this.targrt = guid;
+        console.log('target: ' + guid.toString(16));
+    }
+    
+    ListInventory(cmsg) {
+        var guid = cmsg.uint64();
+        console.log('inventory: ' + guid.toString(16));
     }
 }
 module.exports = Session;

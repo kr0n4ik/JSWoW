@@ -20,7 +20,7 @@ class CMSG {
 		return val;
 	}
 	uint64() {
-		return this.uint32() | (this.uint32() << 32);
+		return BigInt(this.uint32()) | (BigInt(this.uint32()) << 32n);
 	}
 	uint8() {
 		var val = this.view.getUint8(this.readPos, true);

@@ -1,6 +1,7 @@
 const Object = require('./Object.js');
 const Bytes = require('../utils/Bytes.js');
 const unfield = require('../enums/unfield.js');
+const obfield = require('../enums/obfield.js');
 
 class Unit extends Object {
     constructor(guidlow){
@@ -23,6 +24,8 @@ class Unit extends Object {
         this.level = 1;
         this.displayId = [49,49,49];
         this.health = 1;
+        this.npcflag = 0;
+        this.unitflag = 0;
     }
     ValuesUpdate() {
         super.ValuesUpdate();
@@ -35,16 +38,35 @@ class Unit extends Object {
         if (this.bit.get(unfield.UNIT_FIELD_FACTIONTEMPLATE))
             this.values.uint32(this.factiontemplate);
         
+        if (this.bit.get(unfield.UNIT_FIELD_FLAGS))
+            this.values.uint32(this.unitflag);
+        
         if (this.bit.get(unfield.UNIT_FIELD_DISPLAYID))
             this.values.uint32(this.displayId[0]);
         
         if (this.bit.get(unfield.UNIT_FIELD_NATIVEDISPLAYID))
             this.values.uint32(this.displayId[1]);
+        
+        if (this.bit.get(unfield.UNIT_NPC_FLAGS))
+            this.values.uint32(this.npcflag);
      }
+     ValuesBlock(block) {
+        this.ValuesUpdate();
+        var bits = this.bit.buffer();
+		block.uint8(bits.length/4);
+		block.array(bits, false);
+		block.array(this.values.buffer(), false);
+    }
     MovementBlock(block) {
-        block.uint8(3);
+        switch(this.guidhight) {
+            case 0x0000: block.uint8(0x003); break;
+            case 0xF130: block.uint8(0x002); break;
+        }
 		block.guid(this.guid);
-		block.uint8(0x004);
+        switch(this.guidhight) {
+            case 0x0000: block.uint8(0x004); break;
+            case 0xF130: block.uint8(0x003); break;
+        }
 		block.uint16(this.updateflag); //97
 		block.uint32(0);
 		block.uint16(0);
@@ -64,6 +86,15 @@ class Unit extends Object {
 		block.float(this.FlyBackSpeed);
 		block.float(this.PitchSpeed);
 		block.uint32(parseInt(this.guid & BigInt(0xFFFFFFFF)));
+    }
+    
+    setUnitFlag(val) {
+        this.bit.set(unfield.UNIT_FIELD_FLAGS);
+        this.unitflag = val;
+    }
+    setNpcFlag(val) {
+        this.bit.set(unfield.UNIT_NPC_FLAGS);
+        this.npcflag = val;
     }
     
     setType() {
@@ -96,5 +127,23 @@ class Unit extends Object {
 		this.displayId[1] = id;
 		this.displayId[2] = id;
 	}
+    Create() {
+        this.bit.set(obfield.OBJECT_FIELD_GUID);
+        this.bit.set(obfield.OBJECT_FIELD_GUID + 1);
+        this.bit.set(obfield.OBJECT_FIELD_TYPE);
+        this.bit.set(obfield.OBJECT_FIELD_SCALE_X);
+        this.bit.set(unfield.UNIT_FIELD_FACTIONTEMPLATE);
+        this.bit.set(unfield.UNIT_FIELD_DISPLAYID);
+        this.bit.set(unfield.UNIT_FIELD_NATIVEDISPLAYID);
+        this.bit.set(unfield.UNIT_FIELD_HEALTH);
+        this.bit.set(unfield.UNIT_FIELD_LEVEL);
+        this.bit.set(unfield.UNIT_FIELD_FLAGS);
+        this.bit.set(unfield.UNIT_NPC_FLAGS);
+        
+        var block = new Bytes();
+        this.MovementBlock(block);
+        this.ValuesBlock(block);
+        return block.buffer();
+    }
 }
 module.exports = Unit;

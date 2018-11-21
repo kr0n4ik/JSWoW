@@ -28,7 +28,7 @@ class Object {
 	setEntry(entry) {
 		this.bit.set(obfield.OBJECT_FIELD_ENTRY);
 		this.entry = entry;
-        this.setGuidLow(this.guidlow);
+        this.setGuid(this.guidlow, this.guidhight);
 	}
 	setScale(scale) {
 		this.bit.set(obfield.OBJECT_FIELD_SCALE_X);

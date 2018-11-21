@@ -19,7 +19,7 @@ class Manager {
         this.creatureTemplate = [];
         this.playerInfo = [];
         this.itemTemplate  = [];
-      //  this.LoadCreatureTemplates();
+        this.LoadCreatureTemplates();
      //   this.LoadPlayerInfo();
         this.LoadChrRacesDBC();
       //  this.LoadItemTemplates();
