@@ -25,7 +25,7 @@ class Session {
         this.socket = socket;
         this.AuthChallenge();
     }
-    recive(buffer){
+   /* recive(buffer){
         if (buffer.length < 5)
 			return;
 		
@@ -343,5 +343,6 @@ class Session {
         var item = cmsg.uint32();
         console.log("STORAGE: Item Query = " + item);
     }
+    */
 }
 module.exports = Session;
