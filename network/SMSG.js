@@ -56,6 +56,10 @@ class SMSG {
 		}
 		this.array(packGUID.slice(0, size), false);
 	}
+    time(val) {
+        var date = new Date(val);
+        this.uint32(((date.getFullYear() - 2000) << 24) | (date.getMonth() << 20) | ((date.getDate() - 1) << 14) | (date.getDay() << 11) | (date.getHours() << 6) | date.getMinutes());
+    }
     buffer() {
         if (this.code == 0x0A9 && this.dataLength > 100) {
             this.code = 0x01F6; 

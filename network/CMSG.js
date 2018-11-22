@@ -6,9 +6,11 @@ class CMSG {
         this.code = buffer[3] << 8 | buffer[2];
         this.size = buffer[0] << 8 | buffer[1];
 	}
-    len() {
-        return this.size;
-    }
+    uint8() {
+		var val = this.view.getUint8(this.readPos, true);
+		this.readPos += 1;
+		return val;
+	}
 	uint16() {
 		var val = this.view.getUint16(this.readPos, true);
 		this.readPos += 2;
@@ -22,15 +24,17 @@ class CMSG {
 	uint64() {
 		return BigInt(this.uint32()) | (BigInt(this.uint32()) << 32n);
 	}
-	uint8() {
-		var val = this.view.getUint8(this.readPos, true);
-		this.readPos += 1;
-		return val;
-	}
     float() {
         var val = this.view.getFloat32(this.readPos, true);
 		this.readPos += 4;
 		return val;
+    }
+    array(len = 1, rev = false) {
+        var arr = this.data.subarray(this.readPos, this.readPos + len);
+        if (rev)
+            arr.reverse();
+        this.readPos += len;
+        return new Buffer(arr);
     }
 	string(){
         var strArray = [];

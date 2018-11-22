@@ -26,9 +26,11 @@ class Manager {
     }
     
     LoadChrRacesDBC() {
+        var ms = Date.now();
         for (var val of ChrRaces) {
             this.ChrRaces[val.ID] = val;
         }
+        console.log("server.loading".green, ">> Loaded ChrRaces definitions in " + (Date.now() - ms) + " ms");
     }
     
     LoadItemTemplates() {
@@ -62,6 +64,27 @@ class Manager {
             console.log("server.loading".green, ">> Loaded " + result.length + " player create definitions in " + (Date.now() - ms) + " ms");
         });
     }
+    
+    ReciveSession(socket, buffer) {
+        for (var i in this.map)
+            if (this.map[i].socket && this.map[i].socket == socket)
+                this.map[i].Recive(buffer);
+    }
+    
+    DeleteSession(socket) {
+        for (var i in this.map) {
+            if (this.map[i].socket && this.map[i].socket == socket) {
+                if (!this.map[i].guid) {
+                    this.map.splice(i, 1);
+                    break;
+                }
+                if (this.map[i].ping < (Date.now() - 120000)) //4 ping'a 
+                   this.map.splice(i, 1);
+                break; 
+            }
+        }
+    }
+    
     findBySocket(socket) {
         for (var m of this.map) {
             if (m && m.socket && m.socket == socket)
@@ -71,10 +94,8 @@ class Manager {
     }
     Write(buffer, guid = null) {
         for (var i in manager.map) {
-            if (manager.map[i] && manager.map[i].player && manager.map[i].player.guid != guid) {
-                if (!manager.map[i].Write(buffer)) {
-                   //delete(manager.map[i]); 
-                }
+            if (manager.map[i] && manager.map[i].socket && manager.map[i].online && manager.map[i].guid != guid) {
+                manager.map[i].Write(buffer);
             }
         }
     }
